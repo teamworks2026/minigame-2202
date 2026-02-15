@@ -1,158 +1,468 @@
-// js/config.js
-window.Config = (() => {
-  const CFG = {};
-
-  // ====== EVENT TIMEZONE (VN) ======
-  // Luôn tính theo giờ VN (GMT+7) dù user ở đâu
-  CFG.EVENT_TZ_OFFSET_MIN = 7 * 60; // +0700
-
-  // ====== LOCK MODE ======
-  // "todayOnly": Chỉ đúng ngày đó mới chơi được (hết ngày -> khóa lại)
-  // "cumulative": Đến ngày đó mở, và các ngày trước vẫn chơi được
-  CFG.LOCK_MODE = "todayOnly";
-
-  // ====== GAME SETTINGS ======
-  CFG.GAME = {
-    cols: 4,
-    rows: 3,
-    seconds: 90,
-    passThreshold: 80
-  };
-
-  // ====== DAY CONFIG ======
-  // SỬA ngày mở ở OPEN_DATE theo ý bạn (YYYY-MM-DD)
-  CFG.DAYS = {
-    1: {
-      title: "Ngày 1 • Thành phố 1",
-      img: "assets/day1.jpg",
-      reward: "2",
-      OPEN_DATE: "2026-02-15"
-    },
-    2: {
-      title: "Ngày 2 • Thành phố 2",
-      img: "assets/day2.jpg",
-      reward: "2",
-      OPEN_DATE: "2026-02-16"
-    },
-    3: {
-      title: "Ngày 3 • Thành phố 3",
-      img: "assets/day3.jpg",
-      reward: "02",     // ngày 3 nhận 2 số
-      OPEN_DATE: "2026-02-17"
-    }
-  };
-
-  // ====== GOOGLE FORM ======
-  // OPTION A (khuyên dùng): 1 FORM CHUNG cho cả 3 ngày
-  // CFG.FORM = { BASE: "...", ENTRY: {...} };
-
-  // OPTION B: 3 FORM RIÊNG theo từng ngày (mở đúng ngày)
-  CFG.FORM_BY_DAY = {
-    1: { BASE: "", ENTRY: {} },
-    2: { BASE: "", ENTRY: {} },
-    3: { BASE: "", ENTRY: {} }
-  };
-
-  // ====== TIME HELPERS (VN TZ) ======
+// js/play.js — FINAL SIMPLE PUZZLE (ALWAYS DRAG ENABLED)
+(() => {
+  Storage.ensureProfile();
+  const $ = (id) => document.getElementById(id);
   const pad2 = (n) => (n < 10 ? "0" + n : "" + n);
 
-  function tzNow() {
-    // date shifted so UTC getters represent VN local time
-    return new Date(Date.now() + CFG.EVENT_TZ_OFFSET_MIN * 60000);
+  function parseDayFromUrl() {
+    const u = new URL(location.href);
+    const q = u.searchParams.get("day");
+    if (q && ["1", "2", "3"].includes(q)) return Number(q);
+    const auto = Config.getTodayEventDay?.();
+    return auto || 1;
   }
-  function tzYMD(d) {
-    return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
-  }
-  function parseYMD(s) {
-    const [Y, M, D] = s.split("-").map(Number);
-    return { Y, M, D };
-  }
-  function tzMidnightMs(ymd) {
-    // midnight at VN time -> convert to absolute ms
-    const { Y, M, D } = parseYMD(ymd);
-    const utcMidnight = Date.UTC(Y, M - 1, D, 0, 0, 0);
-    return utcMidnight - CFG.EVENT_TZ_OFFSET_MIN * 60000;
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
   }
 
-  CFG.getDayConfig = (day) => CFG.DAYS[day] || null;
+  const day = parseDayFromUrl();
+  const dc = Config.getDayConfig(day);
+  if (!dc) { location.href = "index.html"; return; }
 
-  CFG.isDayOpen = (day) => {
-    const dc = CFG.getDayConfig(day);
-    if (!dc) return false;
+  // Required DOM
+  const boardEl = $("board");
+  const sceneTitle = $("sceneTitle");
+  const timeEl = $("timeLeft");
+  const progEl = $("progress");
+  const statusEl = $("status");
 
-    const today = tzYMD(tzNow());
-    if (CFG.LOCK_MODE === "todayOnly") {
-      return today === dc.OPEN_DATE;
+  const btnShowRef = $("btnShowRef");
+  const btnStart = $("btnStart");
+  const btnShuffle = $("btnShuffle");
+  const btnRestart = $("btnRestart");
+
+  const modalRef = $("modalRef");
+  const refImgEl = $("refImg");
+  const btnIRemember = $("btnIRemember");
+  const btnCloseRef = $("btnCloseRef");
+
+  const modalResult = $("modalResult");
+  const resultTitle = $("resultTitle");
+  const resultText = $("resultText");
+  const resultActions = $("resultActions");
+
+  const modalMirror = $("modalMirror");
+  const mirrorGrid = $("mirrorGrid");
+  const btnMirrorCancel = $("btnMirrorCancel");
+
+  sceneTitle.textContent = dc.title;
+
+  const G = Config.GAME;
+  const COLS = G.cols;
+  const ROWS = G.rows;
+  const TOTAL = COLS * ROWS;
+  const PASS = G.passThreshold ?? 80;
+
+  let img = null;
+  let started = false;
+  let running = false;
+  let doneReward = false;
+
+  let timer = G.seconds;
+  let timerHandle = null;
+
+  // tilesByPos[pos] = tileId (tileId is correct piece index)
+  let tilesByPos = [];
+  let selectedPos = null;
+
+  // ALWAYS ON
+  const dragEnabled = true;
+
+  // prevent click after drag
+  let suppressClickUntil = 0;
+
+  function openRef() { modalRef.classList.add("show"); }
+  function closeRef() { modalRef.classList.remove("show"); }
+
+  function setBoardEnabled(on) {
+    boardEl.classList.toggle("disabled", !on);
+    boardEl.style.pointerEvents = on ? "auto" : "none";
+  }
+
+  function buildBoardAspect() {
+    if (img?.naturalWidth && img?.naturalHeight) {
+      boardEl.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
     }
-    // cumulative
-    return Date.now() >= tzMidnightMs(dc.OPEN_DATE);
+  }
+
+  function tileBgStyle(tileId) {
+    const tx = tileId % COLS;
+    const ty = Math.floor(tileId / COLS);
+
+    const sizeX = COLS * 100;
+    const sizeY = ROWS * 100;
+
+    const px = (COLS === 1) ? 0 : (tx / (COLS - 1)) * 100;
+    const py = (ROWS === 1) ? 0 : (ty / (ROWS - 1)) * 100;
+
+    return {
+      backgroundImage: `url(${dc.img})`,
+      backgroundSize: `${sizeX}% ${sizeY}%`,
+      backgroundPosition: `${px}% ${py}%`,
+      backgroundRepeat: "no-repeat",
+    };
+  }
+
+  function computeProgress() {
+    let correct = 0;
+    for (let pos = 0; pos < TOTAL; pos++) {
+      if (tilesByPos[pos] === pos) correct++;
+    }
+    return Math.round((correct / TOTAL) * 100);
+  }
+
+  function updateProgress() {
+    progEl.textContent = computeProgress() + "%";
+  }
+
+  function getTileEl(pos) {
+    return boardEl.querySelector(`.puzTile[data-pos="${pos}"]`);
+  }
+
+  function updateTileEl(pos) {
+    const el = getTileEl(pos);
+    if (!el) return;
+    const tileId = tilesByPos[pos];
+    el.dataset.tile = String(tileId);
+    Object.assign(el.style, tileBgStyle(tileId));
+  }
+
+  function swapFlash(el) {
+    if (!el) return;
+    el.classList.remove("swapFlash");
+    void el.offsetWidth;
+    el.classList.add("swapFlash");
+  }
+
+  function swapPos(a, b) {
+    if (a == null || b == null || a === b) return;
+    [tilesByPos[a], tilesByPos[b]] = [tilesByPos[b], tilesByPos[a]];
+    updateTileEl(a);
+    updateTileEl(b);
+
+    // small visual feedback
+    swapFlash(getTileEl(a));
+    swapFlash(getTileEl(b));
+
+    updateProgress();
+    if (computeProgress() === 100 && !doneReward) finishGame("win");
+  }
+
+  function highlightSelected(pos, on) {
+    const el = getTileEl(pos);
+    if (!el) return;
+    el.classList.toggle("selected", on);
+  }
+
+  function resetPuzzle(doShuffle = true) {
+    tilesByPos = Array.from({ length: TOTAL }, (_, i) => i);
+    if (doShuffle) shuffle(tilesByPos);
+
+    selectedPos = null;
+    renderBoard();
+    updateProgress();
+  }
+
+  function renderBoard() {
+    // IMPORTANT: bind pointerdown here – if you deleted this, drag will be dead.
+    boardEl.innerHTML = "";
+    boardEl.classList.add("puzzleBoard");
+    boardEl.style.display = "grid";
+    boardEl.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`;
+    boardEl.style.gap = "8px";
+    boardEl.style.padding = "10px";
+    boardEl.style.borderRadius = "18px";
+
+    for (let pos = 0; pos < TOTAL; pos++) {
+      const tileId = tilesByPos[pos];
+      const cell = document.createElement("div");
+      cell.className = "puzTile";
+      cell.dataset.pos = String(pos);
+      cell.dataset.tile = String(tileId);
+      Object.assign(cell.style, tileBgStyle(tileId));
+      cell.style.borderRadius = "14px";
+      cell.style.border = "1px solid rgba(255,255,255,.08)";
+      cell.style.backgroundColor = "rgba(255,255,255,.03)";
+      cell.style.aspectRatio = "1 / 1";
+
+      // Drag + Tap fallback
+      cell.addEventListener("pointerdown", onPointerDown, { passive: false });
+      cell.addEventListener("click", onTapSwap);
+
+      boardEl.appendChild(cell);
+    }
+  }
+
+  // Tap swap fallback (still useful)
+  function onTapSwap(e) {
+    if (!running) return;
+    if (Date.now() < suppressClickUntil) return;
+
+    const pos = Number(e.currentTarget.dataset.pos);
+
+    if (selectedPos == null) {
+      selectedPos = pos;
+      highlightSelected(pos, true);
+      return;
+    }
+
+    const a = selectedPos;
+    highlightSelected(a, false);
+    selectedPos = null;
+    swapPos(a, pos);
+  }
+
+  // Drag swap
+  let dragging = null; // {fromPos, el}
+
+  function clearDropTargets() {
+    boardEl.querySelectorAll(".puzTile.dropTarget").forEach(el => el.classList.remove("dropTarget"));
+  }
+
+  function onPointerDown(e) {
+    if (!running || !dragEnabled) return;
+    e.preventDefault();
+
+    const fromPos = Number(e.currentTarget.dataset.pos);
+    const fromEl = e.currentTarget;
+
+    dragging = { fromPos, el: fromEl };
+    fromEl.classList.add("dragging");
+
+    fromEl.setPointerCapture?.(e.pointerId);
+
+    const move = (ev) => {
+      if (!dragging) return;
+      const pointEl = document.elementFromPoint(ev.clientX, ev.clientY);
+      const target = pointEl?.closest?.(".puzTile");
+      clearDropTargets();
+      if (target && target !== dragging.el) target.classList.add("dropTarget");
+    };
+
+    const up = (ev) => {
+      if (!dragging) return;
+
+      const pointEl = document.elementFromPoint(ev.clientX, ev.clientY);
+      const target = pointEl?.closest?.(".puzTile");
+      const toPos = target ? Number(target.dataset.pos) : null;
+
+      dragging.el.classList.remove("dragging");
+      clearDropTargets();
+
+      const a = dragging.fromPos;
+      dragging = null;
+
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+
+      if (toPos != null) {
+        swapPos(a, toPos);
+        suppressClickUntil = Date.now() + 250;
+      }
+    };
+
+    window.addEventListener("pointermove", move, { passive: true });
+    window.addEventListener("pointerup", up, { passive: true });
+  }
+
+  // Timer
+  function startTimer() {
+    if (timerHandle) clearInterval(timerHandle);
+    timerHandle = setInterval(() => {
+      if (!running) return;
+      timer = Math.max(0, timer - 1);
+      const m = Math.floor(timer / 60);
+      const s = timer % 60;
+      timeEl.textContent = `${pad2(m)}:${pad2(s)}`;
+      if (timer <= 0) {
+        clearInterval(timerHandle);
+        finishGame("timeout");
+      }
+    }, 1000);
+  }
+
+  // Result helpers
+  function showResult(title, html, actions) {
+    modalResult.classList.add("show");
+    resultTitle.textContent = title;
+    resultText.innerHTML = html;
+    resultActions.innerHTML = "";
+    (actions || []).forEach((a) => {
+      const b = document.createElement("button");
+      b.className = a.cls;
+      b.textContent = a.text;
+      b.onclick = a.onClick;
+      resultActions.appendChild(b);
+    });
+  }
+
+  function randDigit() { return String(Math.floor(Math.random() * 10)); }
+  function randTwo() { return pad2(Math.floor(Math.random() * 100)); }
+
+  function showMirror(accuracy, timeUsed) {
+    modalMirror.classList.add("show");
+    mirrorGrid.innerHTML = "";
+
+    const correct = dc.reward;
+    const decoys = [];
+    while (decoys.length < 2) {
+      const d = correct.length === 2 ? randTwo() : randDigit();
+      if (d !== correct && !decoys.includes(d)) decoys.push(d);
+    }
+
+    const options = shuffle([correct, decoys[0], decoys[1]]);
+    const correctIndex = options.indexOf(correct);
+
+    options.forEach((_, idx) => {
+      const card = document.createElement("div");
+      card.className = "mirror";
+      card.innerHTML = `<div class="mirrorTitle">Gương ${idx + 1}</div><div class="mirrorSub">Chạm để chọn</div>`;
+      card.onclick = () => {
+        modalMirror.classList.remove("show");
+        if (idx === correctIndex) {
+          doneReward = true;
+          giveReward(correct, accuracy, timeUsed, false);
+        } else {
+          showResult("Sai gương rồi!",
+            `Gương bạn chọn không có số đúng. Hãy chơi lại để thử tiếp.<br/>Tiến độ đúng: <b>${accuracy}%</b>`,
+            [
+              { text: "Chơi lại", cls: "btn", onClick: () => { modalResult.classList.remove("show"); restartAll(); } },
+              { text: "Về trang chính", cls: "btnGhost", onClick: () => (location.href = "index.html") },
+            ]
+          );
+        }
+      };
+      mirrorGrid.appendChild(card);
+    });
+  }
+
+  function giveReward(rewardStr, accuracy, timeUsed, directWin) {
+    Storage.setDigit(day, rewardStr);
+
+    const digits = Storage.getDigits();
+    const code = Storage.getFinalCode();
+    const profile = Storage.getProfile();
+
+    const payload = {
+      id: profile.id,
+      name: profile.name || "",
+      code: code || "",
+      d1: digits["1"] || "",
+      d2: digits["2"] || "",
+      d3: digits["3"] || "",
+      day,
+      accuracy,
+      timeUsed,
+    };
+    const url = Config.buildSubmitUrl(payload);
+
+    const msg = directWin
+      ? `Bạn đã ghép đúng <b>100%</b>! Nhận số: <b>${rewardStr}</b><br/>Mã hiện tại: <b>${code}</b>`
+      : `Bạn đã chọn đúng gương! Nhận số: <b>${rewardStr}</b><br/>Mã hiện tại: <b>${code}</b>`;
+
+    showResult("Chúc mừng!", msg, [
+      { text: "Gửi kết quả (Google Form)", cls: "btn", onClick: () => window.open(url, "_blank", "noopener,noreferrer") },
+      { text: "Về trang chính", cls: "btnGhost", onClick: () => (location.href = "index.html") },
+    ]);
+  }
+
+  function finishGame(reason) {
+    if (doneReward) return;
+    running = false;
+
+    const accuracy = computeProgress();
+    const timeUsed = G.seconds - timer;
+
+    const profile = Storage.getProfile();
+    Storage.addHistory({
+      ts: new Date().toISOString(),
+      day,
+      accuracy,
+      timeUsed,
+      userId: profile.id,
+      name: profile.name || "",
+    });
+
+    if (reason === "win") {
+      doneReward = true;
+      giveReward(dc.reward, accuracy, timeUsed, true);
+      return;
+    }
+
+    if (timer <= 0 && accuracy >= PASS) {
+      showMirror(accuracy, timeUsed);
+      return;
+    }
+
+    showResult("Chưa đạt",
+      `Tiến độ đúng: <b>${accuracy}%</b> • Bạn cần <b>100%</b> (hoặc ≥ <b>${PASS}%</b> khi hết giờ để mở gương).`,
+      [
+        { text: "Chơi lại", cls: "btn", onClick: () => { modalResult.classList.remove("show"); restartAll(); } },
+        { text: "Về trang chính", cls: "btnGhost", onClick: () => (location.href = "index.html") },
+      ]
+    );
+  }
+
+  function restartAll() {
+    doneReward = false;
+    started = false;
+    running = false;
+    timer = G.seconds;
+    if (timerHandle) clearInterval(timerHandle);
+    setBoardEnabled(false);
+    resetPuzzle(true);
+    openRef();
+    statusEl.textContent = "Xem tranh gốc, bấm “Tôi đã nhớ” để bắt đầu.";
+  }
+
+  // UI
+  btnShowRef.onclick = openRef;
+  btnStart.onclick = openRef;
+  btnCloseRef.onclick = closeRef;
+
+  btnIRemember.onclick = () => {
+    closeRef();
+    if (!started) {
+      started = true;
+      running = true;
+      timer = G.seconds;
+      setBoardEnabled(true);
+      startTimer();
+      statusEl.textContent = "Đang chơi... Kéo-thả để đổi chỗ (swap).";
+    }
   };
 
-  CFG.getGateStatus = (day) => {
-    const dc = CFG.getDayConfig(day);
-    if (!dc) return { ok: false, reason: "NO_DAY" };
-
-    const now = Date.now();
-    const openMs = tzMidnightMs(dc.OPEN_DATE);
-
-    if (CFG.LOCK_MODE === "todayOnly") {
-      const today = tzYMD(tzNow());
-      if (today === dc.OPEN_DATE) return { ok: true };
-      // nếu chưa đến ngày mở -> countdown tới mở
-      if (now < openMs) return { ok: false, reason: "NOT_YET", openMs };
-      // nếu đã qua ngày mở -> khoá lại (todayOnly)
-      return { ok: false, reason: "EXPIRED", openMs };
-    }
-
-    // cumulative
-    if (now >= openMs) return { ok: true };
-    return { ok: false, reason: "NOT_YET", openMs };
+  btnShuffle.onclick = () => {
+    if (!started) return;
+    resetPuzzle(true);
+    statusEl.textContent = "Đã trộn lại!";
   };
 
-  // Auto chọn day theo ngày (nếu bạn muốn index.html bấm "Chơi hôm nay")
-  CFG.getTodayEventDay = () => {
-    const today = tzYMD(tzNow());
-    const days = Object.keys(CFG.DAYS).map(Number).sort((a, b) => a - b);
+  btnRestart.onclick = restartAll;
+  btnMirrorCancel.onclick = () => modalMirror.classList.remove("show");
 
-    if (CFG.LOCK_MODE === "todayOnly") {
-      const found = days.find(d => CFG.DAYS[d].OPEN_DATE === today);
-      return found || days[0];
-    }
+  // Init
+  (async function init() {
+    refImgEl.src = dc.img;
 
-    // cumulative: chọn day lớn nhất đã mở
-    let best = days[0];
-    for (const d of days) {
-      if (Date.now() >= tzMidnightMs(CFG.DAYS[d].OPEN_DATE)) best = d;
-    }
-    return best;
-  };
+    img = await new Promise((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve(im);
+      im.onerror = () => reject(new Error("Không load được ảnh: " + dc.img));
+      im.src = dc.img;
+    });
 
-  // ====== SUBMIT URL BUILDER ======
-  // Bạn có thể dùng 1 form chung (CFG.FORM) hoặc 3 form theo ngày (CFG.FORM_BY_DAY)
-  CFG.buildSubmitUrl = (payload) => {
-    // nếu day đó đang bị khoá -> không cho submit
-    if (!CFG.isDayOpen(payload.day)) return "";
-
-    const form = CFG.FORM_BY_DAY?.[payload.day] || CFG.FORM;
-    if (!form?.BASE) return "";
-
-    const u = new URL(form.BASE);
-    u.searchParams.set("usp", "pp_url");
-
-    const E = form.ENTRY || {};
-    // map theo entry ID bạn điền trong config
-    if (E.id) u.searchParams.set(E.id, payload.id || "");
-    if (E.name) u.searchParams.set(E.name, payload.name || "");
-    if (E.day) u.searchParams.set(E.day, String(payload.day || ""));
-    if (E.code) u.searchParams.set(E.code, payload.code || "");
-    if (E.d1) u.searchParams.set(E.d1, payload.d1 || "");
-    if (E.d2) u.searchParams.set(E.d2, payload.d2 || "");
-    if (E.d3) u.searchParams.set(E.d3, payload.d3 || "");
-    if (E.accuracy) u.searchParams.set(E.accuracy, String(payload.accuracy ?? ""));
-    if (E.timeUsed) u.searchParams.set(E.timeUsed, String(payload.timeUsed ?? ""));
-
-    return u.toString();
-  };
-
-  return CFG;
+    buildBoardAspect();
+    setBoardEnabled(false);
+    resetPuzzle(true);
+    openRef();
+    statusEl.textContent = "Xem tranh gốc, bấm “Tôi đã nhớ” để bắt đầu.";
+  })().catch((err) => {
+    console.error(err);
+    alert(err.message);
+  });
 })();
