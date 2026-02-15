@@ -144,7 +144,10 @@
     Object.assign(el.style, tileBgStyle(tilesByPos[pos]));
   }
   function flash(el){
-     return;
+    if (!el) return;
+    el.classList.remove("swapFlash");
+    void el.offsetWidth;
+    el.classList.add("swapFlash");
   }
 
   function swapPos(a,b){
