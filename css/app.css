@@ -282,14 +282,14 @@ h2{margin:0 0 10px 0}
 }
 
 /* Hiệu ứng “swap” nhẹ */
+/* TẮT hoàn toàn hiệu ứng swapFlash */
 .puzTile.swapFlash::after{
-  content:"";
-  position:absolute; inset:0;
-  border-radius:12px;
-  background: radial-gradient(circle at center, rgba(255,122,24,.28), transparent 55%);
-  animation: flash .22s ease-out;
-  pointer-events:none;
+  content: none !important;
+  display: none !important;
+  animation: none !important;
+  background: none !important;
 }
+
 @keyframes flash{
   from{opacity:1;}
   to{opacity:0;}
