@@ -295,27 +295,6 @@ h2{margin:0 0 10px 0}
   to{opacity:0;}
 }
 
-/* ===== FIX vòng cam bị phủ toàn màn hình (swapFlash pseudo-element) ===== */
-
-/* Bắt buộc: để ::after nằm trong đúng ô tile */
-.puzTile{
-  position: relative;     /* QUAN TRỌNG */
-  overflow: hidden;       /* không cho glow tràn ra ngoài */
-}
-
-/* đảm bảo z-index hoạt động khi kéo */
-.puzTile.dragging{
-  position: relative;     /* để z-index có tác dụng */
-  z-index: 50;
-}
-
-/* Board cũng nên có stacking context rõ ràng */
-.puzzleBoard{
-  position: relative;
-  z-index: 1;
-}
-
-/* Pseudo effect chỉ nằm trong tile, không bắt sự kiện */
 /* TẮT hoàn toàn hiệu ứng swapFlash */
 .puzTile.swapFlash::after{
   content: none !important;
