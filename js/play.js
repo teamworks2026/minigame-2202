@@ -152,17 +152,22 @@
   }
 
   function computeProgress() {
-    let correct = 0;
-    for (let y = 0; y < ROWS; y++) {
-      for (let x = 0; x < COLS; x++) {
-        const id = board[y][x];
-        if (id == null) continue;
-        const { tx, ty } = tileTargetPos(id);
-        if (tx === x && ty === y) correct++;
-      }
+  let correct = 0;
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      const raw = board[y][x];
+      if (raw == null) continue;
+
+      const id = Number(raw);
+      const t = tiles?.[id];
+      if (!t) continue;
+
+      // ĐÚNG khi mảnh gốc (tx,ty) nằm đúng ô (x,y)
+      if (t.tx === x && t.ty === y) correct++;
     }
-    return Math.round((correct / TOTAL) * 100);
   }
+  return Math.round((correct / TOTAL) * 100);
+}
 
   function updateProgress() {
     const p = computeProgress();
@@ -413,6 +418,10 @@
       }
     }
 
+    if (ts - lastProgTs > 250) {
+  updateProgress();
+  lastProgTs = ts;
+    }
     draw();
     requestAnimationFrame(loop);
   }
