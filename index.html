@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Săn tìm mã bay 2022 - MiniGame 2202</title>
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <div class="brandTitle">Chuỗi Minigame “Săn tìm mã bay 2022”</div>
+      <div class="brandSub">15/02/2026 – 17/02/2026 • Xếp gạch rơi để ghép thành tranh thành phố</div>
+    </div>
+  </div>
+
+  <main class="container">
+    <section class="card">
+      <h2>Thông tin người chơi</h2>
+      <div class="row">
+        <label class="label">Tên / Nickname</label>
+        <input id="playerName" class="input" placeholder="Ví dụ: Hữu Duyên / CityGames..." />
+      </div>
+      <div class="row">
+        <label class="label">ID tham gia (tự tạo)</label>
+        <div class="mono" id="playerId">...</div>
+      </div>
+      <div class="row">
+        <button class="btn" id="btnSaveName">Lưu</button>
+        <button class="btnGhost" id="btnReset">Reset lịch sử (test)</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Tiến độ mã 2202</h2>
+      <div class="progressWrap">
+        <div class="progressBar"><div id="codeBar" class="progressFill"></div></div>
+        <div class="progressText" id="codeText">Chưa có mã</div>
+      </div>
+
+      <div class="grid3">
+        <div class="dayCard">
+          <div class="dayTitle">Ngày 1</div>
+          <div class="daySub">Nhận 1 số</div>
+          <div class="dayStatus" id="st1">Chưa hoàn thành</div>
+          <button class="btn" id="go1">Chơi ngày 1</button>
+        </div>
+        <div class="dayCard">
+          <div class="dayTitle">Ngày 2</div>
+          <div class="daySub">Nhận 1 số</div>
+          <div class="dayStatus" id="st2">Chưa hoàn thành</div>
+          <button class="btn" id="go2">Chơi ngày 2</button>
+        </div>
+        <div class="dayCard">
+          <div class="dayTitle">Ngày 3</div>
+          <div class="daySub">Nhận 2 số</div>
+          <div class="dayStatus" id="st3">Chưa hoàn thành</div>
+          <button class="btn" id="go3">Chơi ngày 3</button>
+        </div>
+      </div>
+
+      <div class="note">
+        <b>Lưu ý:</b> Website tự nhận “hôm nay là ngày mấy” theo mốc 15–17/02/2026.
+        Nếu muốn test bất kỳ ngày nào, bạn có thể bấm “Chơi ngày 1/2/3” hoặc mở link:
+        <span class="mono">play.html?day=1</span>, <span class="mono">?day=2</span>, <span class="mono">?day=3</span>.
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Submit kết quả</h2>
+      <div class="row">
+        <div class="label">Mã hiện tại</div>
+        <div class="mono" id="finalCode">----</div>
+      </div>
+      <div class="row">
+        <button class="btn" id="btnSubmitAll">Mở Google Form (gửi kết quả)</button>
+        <button class="btnGhost" id="btnCopy">Copy mã</button>
+      </div>
+      <div class="note">
+        Bạn cần chỉnh URL Google Form trong <span class="mono">js/config.js</span> (phần <span class="mono">FORM_URL</span>).
+      </div>
+    </section>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/storage.js"></script>
+  <script>
+    const nameEl = document.getElementById('playerName');
+    const idEl = document.getElementById('playerId');
+    const st1 = document.getElementById('st1');
+    const st2 = document.getElementById('st2');
+    const st3 = document.getElementById('st3');
+    const codeText = document.getElementById('codeText');
+    const codeBar = document.getElementById('codeBar');
+    const finalCode = document.getElementById('finalCode');
+
+    function refreshUI(){
+      const profile = Storage.getProfile();
+      nameEl.value = profile.name || "";
+      idEl.textContent = profile.id;
+
+      const digits = Storage.getDigits(); // {1:"2",2:"2",3:"02"}
+      st1.textContent = digits["1"] ? `Đã nhận số: ${digits["1"]}` : "Chưa hoàn thành";
+      st2.textContent = digits["2"] ? `Đã nhận số: ${digits["2"]}` : "Chưa hoàn thành";
+      st3.textContent = digits["3"] ? `Đã nhận số: ${digits["3"]}` : "Chưa hoàn thành";
+
+      const code = Storage.getFinalCode();
+      finalCode.textContent = code || "----";
+
+      const got = (digits["1"]?1:0) + (digits["2"]?1:0) + (digits["3"]?1:0);
+      const pct = Math.round((got/3)*100);
+      codeBar.style.width = pct + "%";
+      codeText.textContent = got === 0 ? "Chưa có mã" : `Đã hoàn thành ${got}/3 ngày • Mã: ${code || "----"}`;
+    }
+
+    document.getElementById('btnSaveName').onclick = () => {
+      Storage.setName(nameEl.value.trim());
+      refreshUI();
+      alert("Đã lưu!");
+    };
+
+    document.getElementById('btnReset').onclick = () => {
+      if(confirm("Reset toàn bộ lịch sử & mã?")){
+        Storage.resetAll();
+        refreshUI();
+      }
+    };
+
+    document.getElementById('go1').onclick = ()=> location.href = "play.html?day=1";
+    document.getElementById('go2').onclick = ()=> location.href = "play.html?day=2";
+    document.getElementById('go3').onclick = ()=> location.href = "play.html?day=3";
+
+    document.getElementById('btnCopy').onclick = async () => {
+      const code = Storage.getFinalCode() || "";
+      try{
+        await navigator.clipboard.writeText(code);
+        alert("Đã copy: " + code);
+      }catch(e){
+        alert("Không copy được, bạn copy thủ công: " + code);
+      }
+    };
+
+    document.getElementById('btnSubmitAll').onclick = () => {
+      const profile = Storage.getProfile();
+      const digits = Storage.getDigits();
+      const code = Storage.getFinalCode();
+      const payload = {
+        id: profile.id,
+        name: profile.name || "",
+        code: code || "",
+        d1: digits["1"] || "",
+        d2: digits["2"] || "",
+        d3: digits["3"] || ""
+      };
+      const url = Config.buildSubmitUrl(payload);
+      window.open(url, "_blank", "noopener,noreferrer");
+    };
+
+    // init
+    Storage.ensureProfile();
+    refreshUI();
+  </script>
+</body>
+</html>
