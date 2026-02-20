@@ -1,3 +1,5 @@
+
+console.log("PLAY TILE VERSION LOADED ✅");
 // js/play.js (TILE-IMAGE VERSION: cắt ảnh gốc thành gạch và ghép lại)
 (() => {
   Storage.ensureProfile();
