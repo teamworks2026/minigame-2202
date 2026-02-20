@@ -1,4 +1,4 @@
-// js/play.js — Simple Puzzle Swap (drag/tap)
+// js/play.js — FINAL SIMPLE PUZZLE (ALWAYS DRAG ENABLED)
 (() => {
   Storage.ensureProfile();
   const $ = (id) => document.getElementById(id);
@@ -8,7 +8,7 @@
     const u = new URL(location.href);
     const q = u.searchParams.get("day");
     if (q && ["1", "2", "3"].includes(q)) return Number(q);
-    const auto = Config.getTodayEventDay();
+    const auto = Config.getTodayEventDay?.();
     return auto || 1;
   }
   function shuffle(arr) {
@@ -21,15 +21,11 @@
 
   const day = parseDayFromUrl();
   const dc = Config.getDayConfig(day);
-  if (!dc) return (location.href = "index.html");
-  $("sceneTitle").textContent = dc.title;
+  if (!dc) { location.href = "index.html"; return; }
 
-  const G = Config.GAME;
-  const COLS = G.cols;
-  const ROWS = G.rows;
-  const TOTAL = COLS * ROWS;
-
+  // Required DOM
   const boardEl = $("board");
+  const sceneTitle = $("sceneTitle");
   const timeEl = $("timeLeft");
   const progEl = $("progress");
   const statusEl = $("status");
@@ -53,9 +49,13 @@
   const mirrorGrid = $("mirrorGrid");
   const btnMirrorCancel = $("btnMirrorCancel");
 
-  let dragEnabled = true; // LUÔN BẬT
-  if (toggleDrag) toggleDrag.style.display = "none";
-  let suppressClickUntil = 0;
+  sceneTitle.textContent = dc.title;
+
+  const G = Config.GAME;
+  const COLS = G.cols;
+  const ROWS = G.rows;
+  const TOTAL = COLS * ROWS;
+  const PASS = G.passThreshold ?? 80;
 
   let img = null;
   let started = false;
@@ -65,9 +65,15 @@
   let timer = G.seconds;
   let timerHandle = null;
 
-  // tilesByPos[pos] = tileId (tileId is the correct piece index)
+  // tilesByPos[pos] = tileId (tileId is correct piece index)
   let tilesByPos = [];
   let selectedPos = null;
+
+  // ALWAYS ON
+  const dragEnabled = true;
+
+  // prevent click after drag
+  let suppressClickUntil = 0;
 
   function openRef() { modalRef.classList.add("show"); }
   function closeRef() { modalRef.classList.remove("show"); }
@@ -78,7 +84,6 @@
   }
 
   function buildBoardAspect() {
-    // keep same aspect ratio as image
     if (img?.naturalWidth && img?.naturalHeight) {
       boardEl.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
     }
@@ -98,50 +103,8 @@
       backgroundImage: `url(${dc.img})`,
       backgroundSize: `${sizeX}% ${sizeY}%`,
       backgroundPosition: `${px}% ${py}%`,
+      backgroundRepeat: "no-repeat",
     };
-  }
-
-  function renderBoard() {
-    boardEl.innerHTML = "";
-    boardEl.style.display = "grid";
-    boardEl.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`;
-    boardEl.style.gap = "6px";
-    boardEl.style.touchAction = "none";
-
-    for (let pos = 0; pos < TOTAL; pos++) {
-      const tileId = tilesByPos[pos];
-      const cell = document.createElement("div");
-      cell.className = "puzTile";
-      cell.dataset.pos = String(pos);
-      cell.dataset.tile = String(tileId);
-
-      const s = tileBgStyle(tileId);
-      Object.assign(cell.style, s);
-
-      cell.addEventListener("pointerdown", onPointerDown, { passive: false });
-      cell.addEventListener("click", onTapSwap);
-
-      boardEl.appendChild(cell);
-    }
-    updateProgress();
-  }
-
-  function updateTileEl(pos) {
-    const el = boardEl.querySelector(`.puzTile[data-pos="${pos}"]`);
-    if (!el) return;
-    const tileId = tilesByPos[pos];
-    el.dataset.tile = String(tileId);
-    const s = tileBgStyle(tileId);
-    Object.assign(el.style, s);
-  }
-
-  function swapPos(a, b) {
-    if (a == null || b == null || a === b) return;
-    [tilesByPos[a], tilesByPos[b]] = [tilesByPos[b], tilesByPos[a]];
-    updateTileEl(a);
-    updateTileEl(b);
-    updateProgress();
-    if (computeProgress() === 100 && !doneReward) finishGame("win");
   }
 
   function computeProgress() {
@@ -153,99 +116,160 @@
   }
 
   function updateProgress() {
-    const p = computeProgress();
-    progEl.textContent = p + "%";
+    progEl.textContent = computeProgress() + "%";
   }
 
-  function resetPuzzle(shuffleIt = true) {
+  function getTileEl(pos) {
+    return boardEl.querySelector(`.puzTile[data-pos="${pos}"]`);
+  }
+
+  function updateTileEl(pos) {
+    const el = getTileEl(pos);
+    if (!el) return;
+    const tileId = tilesByPos[pos];
+    el.dataset.tile = String(tileId);
+    Object.assign(el.style, tileBgStyle(tileId));
+  }
+
+  function swapFlash(el) {
+    if (!el) return;
+    el.classList.remove("swapFlash");
+    void el.offsetWidth;
+    el.classList.add("swapFlash");
+  }
+
+  function swapPos(a, b) {
+    if (a == null || b == null || a === b) return;
+    [tilesByPos[a], tilesByPos[b]] = [tilesByPos[b], tilesByPos[a]];
+    updateTileEl(a);
+    updateTileEl(b);
+
+    // small visual feedback
+    swapFlash(getTileEl(a));
+    swapFlash(getTileEl(b));
+
+    updateProgress();
+    if (computeProgress() === 100 && !doneReward) finishGame("win");
+  }
+
+  function highlightSelected(pos, on) {
+    const el = getTileEl(pos);
+    if (!el) return;
+    el.classList.toggle("selected", on);
+  }
+
+  function resetPuzzle(doShuffle = true) {
     tilesByPos = Array.from({ length: TOTAL }, (_, i) => i);
-    if (shuffleIt) shuffle(tilesByPos);
+    if (doShuffle) shuffle(tilesByPos);
+
     selectedPos = null;
     renderBoard();
+    updateProgress();
   }
 
-  // ===== Tap-to-swap (always works on mobile) =====
+  function renderBoard() {
+    // IMPORTANT: bind pointerdown here – if you deleted this, drag will be dead.
+    boardEl.innerHTML = "";
+    boardEl.classList.add("puzzleBoard");
+    boardEl.style.display = "grid";
+    boardEl.style.gridTemplateColumns = `repeat(${COLS}, 1fr)`;
+    boardEl.style.gap = "8px";
+    boardEl.style.padding = "10px";
+    boardEl.style.borderRadius = "18px";
+
+    for (let pos = 0; pos < TOTAL; pos++) {
+      const tileId = tilesByPos[pos];
+      const cell = document.createElement("div");
+      cell.className = "puzTile";
+      cell.dataset.pos = String(pos);
+      cell.dataset.tile = String(tileId);
+      Object.assign(cell.style, tileBgStyle(tileId));
+      cell.style.borderRadius = "14px";
+      cell.style.border = "1px solid rgba(255,255,255,.08)";
+      cell.style.backgroundColor = "rgba(255,255,255,.03)";
+      cell.style.aspectRatio = "1 / 1";
+
+      // Drag + Tap fallback
+      cell.addEventListener("pointerdown", onPointerDown, { passive: false });
+      cell.addEventListener("click", onTapSwap);
+
+      boardEl.appendChild(cell);
+    }
+  }
+
+  // Tap swap fallback (still useful)
   function onTapSwap(e) {
     if (!running) return;
-  if (Date.now() < suppressClickUntil) return; // vừa kéo thả xong thì bỏ qua click
-  const pos = Number(e.currentTarget.dataset.pos);
+    if (Date.now() < suppressClickUntil) return;
 
-    // select first
+    const pos = Number(e.currentTarget.dataset.pos);
+
     if (selectedPos == null) {
       selectedPos = pos;
       highlightSelected(pos, true);
       return;
     }
 
-    // swap
     const a = selectedPos;
     highlightSelected(a, false);
     selectedPos = null;
     swapPos(a, pos);
   }
 
-  function highlightSelected(pos, on) {
-    const el = boardEl.querySelector(`.puzTile[data-pos="${pos}"]`);
-    if (!el) return;
-    el.classList.toggle("selected", on);
+  // Drag swap
+  let dragging = null; // {fromPos, el}
+
+  function clearDropTargets() {
+    boardEl.querySelectorAll(".puzTile.dropTarget").forEach(el => el.classList.remove("dropTarget"));
   }
 
-  // ===== Drag-to-swap (pointer events) =====
-let dragging = null; // {fromPos, el}
+  function onPointerDown(e) {
+    if (!running || !dragEnabled) return;
+    e.preventDefault();
 
-function clearDropTargets(){
-  boardEl.querySelectorAll(".puzTile.dropTarget").forEach(el => el.classList.remove("dropTarget"));
-}
+    const fromPos = Number(e.currentTarget.dataset.pos);
+    const fromEl = e.currentTarget;
 
-function onPointerDown(e) {
-  if (!running || !dragEnabled) return;
-  e.preventDefault();
+    dragging = { fromPos, el: fromEl };
+    fromEl.classList.add("dragging");
 
-  const fromPos = Number(e.currentTarget.dataset.pos);
-  const fromEl = e.currentTarget;
+    fromEl.setPointerCapture?.(e.pointerId);
 
-  dragging = { fromPos, el: fromEl };
-  fromEl.classList.add("dragging");
+    const move = (ev) => {
+      if (!dragging) return;
+      const pointEl = document.elementFromPoint(ev.clientX, ev.clientY);
+      const target = pointEl?.closest?.(".puzTile");
+      clearDropTargets();
+      if (target && target !== dragging.el) target.classList.add("dropTarget");
+    };
 
-  // bắt pointer vào chính tile (ổn định hơn)
-  fromEl.setPointerCapture?.(e.pointerId);
+    const up = (ev) => {
+      if (!dragging) return;
 
-  const move = (ev) => {
-    if (!dragging) return;
-    const pointEl = document.elementFromPoint(ev.clientX, ev.clientY);
-    const target = pointEl?.closest?.(".puzTile");
-    clearDropTargets();
-    if (target && target !== dragging.el) target.classList.add("dropTarget");
-  };
+      const pointEl = document.elementFromPoint(ev.clientX, ev.clientY);
+      const target = pointEl?.closest?.(".puzTile");
+      const toPos = target ? Number(target.dataset.pos) : null;
 
-  const up = (ev) => {
-    if (!dragging) return;
+      dragging.el.classList.remove("dragging");
+      clearDropTargets();
 
-    const pointEl = document.elementFromPoint(ev.clientX, ev.clientY);
-    const target = pointEl?.closest?.(".puzTile");
-    const toPos = target ? Number(target.dataset.pos) : null;
+      const a = dragging.fromPos;
+      dragging = null;
 
-    dragging.el.classList.remove("dragging");
-    clearDropTargets();
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
 
-    const a = dragging.fromPos;
-    dragging = null;
+      if (toPos != null) {
+        swapPos(a, toPos);
+        suppressClickUntil = Date.now() + 250;
+      }
+    };
 
-    window.removeEventListener("pointermove", move);
-    window.removeEventListener("pointerup", up);
+    window.addEventListener("pointermove", move, { passive: true });
+    window.addEventListener("pointerup", up, { passive: true });
+  }
 
-    if (toPos != null) {
-      swapPos(a, toPos);
-      suppressClickUntil = Date.now() + 250; // ngăn click swap chen vào
-    }
-  };
-
-  window.addEventListener("pointermove", move, { passive: true });
-  window.addEventListener("pointerup", up, { passive: true });
-}
-
-
-  // ===== Timer =====
+  // Timer
   function startTimer() {
     if (timerHandle) clearInterval(timerHandle);
     timerHandle = setInterval(() => {
@@ -254,7 +278,6 @@ function onPointerDown(e) {
       const m = Math.floor(timer / 60);
       const s = timer % 60;
       timeEl.textContent = `${pad2(m)}:${pad2(s)}`;
-
       if (timer <= 0) {
         clearInterval(timerHandle);
         finishGame("timeout");
@@ -262,13 +285,12 @@ function onPointerDown(e) {
     }, 1000);
   }
 
-  // ===== Result / Mirror / Reward =====
+  // Result helpers
   function showResult(title, html, actions) {
     modalResult.classList.add("show");
     resultTitle.textContent = title;
     resultText.innerHTML = html;
     resultActions.innerHTML = "";
-
     (actions || []).forEach((a) => {
       const b = document.createElement("button");
       b.className = a.cls;
@@ -291,6 +313,7 @@ function onPointerDown(e) {
       const d = correct.length === 2 ? randTwo() : randDigit();
       if (d !== correct && !decoys.includes(d)) decoys.push(d);
     }
+
     const options = shuffle([correct, decoys[0], decoys[1]]);
     const correctIndex = options.indexOf(correct);
 
@@ -370,13 +393,13 @@ function onPointerDown(e) {
       return;
     }
 
-    if (timer <= 0 && accuracy >= (G.passThreshold ?? 80)) {
+    if (timer <= 0 && accuracy >= PASS) {
       showMirror(accuracy, timeUsed);
       return;
     }
 
     showResult("Chưa đạt",
-      `Tiến độ đúng: <b>${accuracy}%</b> • Bạn cần <b>100%</b> (hoặc ≥ <b>${G.passThreshold ?? 80}%</b> khi hết giờ để mở gương).`,
+      `Tiến độ đúng: <b>${accuracy}%</b> • Bạn cần <b>100%</b> (hoặc ≥ <b>${PASS}%</b> khi hết giờ để mở gương).`,
       [
         { text: "Chơi lại", cls: "btn", onClick: () => { modalResult.classList.remove("show"); restartAll(); } },
         { text: "Về trang chính", cls: "btnGhost", onClick: () => (location.href = "index.html") },
@@ -389,7 +412,6 @@ function onPointerDown(e) {
     started = false;
     running = false;
     timer = G.seconds;
-    timeEl.textContent = "01:30";
     if (timerHandle) clearInterval(timerHandle);
     setBoardEnabled(false);
     resetPuzzle(true);
@@ -397,11 +419,10 @@ function onPointerDown(e) {
     statusEl.textContent = "Xem tranh gốc, bấm “Tôi đã nhớ” để bắt đầu.";
   }
 
-  // ===== UI events =====
+  // UI
   btnShowRef.onclick = openRef;
+  btnStart.onclick = openRef;
   btnCloseRef.onclick = closeRef;
-
-  btnStart.onclick = () => openRef();
 
   btnIRemember.onclick = () => {
     closeRef();
@@ -411,28 +432,23 @@ function onPointerDown(e) {
       timer = G.seconds;
       setBoardEnabled(true);
       startTimer();
-      statusEl.textContent = dragEnabled
-        ? "Đang chơi... Kéo-thả để đổi chỗ (swap)."
-        : "Đang chơi... Chạm 2 mảnh để đổi chỗ.";
+      statusEl.textContent = "Đang chơi... Kéo-thả để đổi chỗ (swap).";
     }
   };
 
   btnShuffle.onclick = () => {
-    if (!started) return; // trộn khi đang chơi
+    if (!started) return;
     resetPuzzle(true);
     statusEl.textContent = "Đã trộn lại!";
   };
 
   btnRestart.onclick = restartAll;
-
-  
-
   btnMirrorCancel.onclick = () => modalMirror.classList.remove("show");
 
-  // ===== init =====
+  // Init
   (async function init() {
     refImgEl.src = dc.img;
-    // preload image to get aspect ratio
+
     img = await new Promise((resolve, reject) => {
       const im = new Image();
       im.onload = () => resolve(im);
@@ -444,6 +460,7 @@ function onPointerDown(e) {
     setBoardEnabled(false);
     resetPuzzle(true);
     openRef();
+    statusEl.textContent = "Xem tranh gốc, bấm “Tôi đã nhớ” để bắt đầu.";
   })().catch((err) => {
     console.error(err);
     alert(err.message);
