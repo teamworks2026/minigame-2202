@@ -418,13 +418,7 @@ function onPointerDown(e) {
 
   btnRestart.onclick = restartAll;
 
-  toggleDrag.addEventListener("change", () => {
-    dragEnabled = !!toggleDrag.checked;
-    localStorage.setItem(K_DRAG, dragEnabled ? "1" : "0");
-    statusEl.textContent = dragEnabled
-      ? "Kéo-thả đang BẬT: kéo mảnh để đổi chỗ (swap)."
-      : "Kéo-thả đang TẮT: chạm 2 mảnh để đổi chỗ.";
-  });
+  
 
   btnMirrorCancel.onclick = () => modalMirror.classList.remove("show");
 
