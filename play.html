@@ -25,56 +25,44 @@
           <div class="hudValue" id="progress">0%</div>
         </div>
         <div class="hudItem">
-          <div class="hudLabel">Điều khiển</div>
-          <div class="hudSmall">← → di chuyển • ↑ xoay • ↓ rơi nhanh • Space thả</div>
+          <div class="hudLabel">Cách chơi</div>
+          <div class="hudSmall">
+            Kéo-thả để đổi chỗ (swap) • Hoặc chạm 2 mảnh để swap
+          </div>
         </div>
       </div>
 
-      <div class="gameWrap">
-        <canvas id="game" width="360" height="504"></canvas>
+      <div class="puzzleWrap">
+        <div class="puzzleBoard disabled" id="board"></div>
 
         <div class="side">
           <div class="panel">
-            <div class="panelTitle">Miếng tiếp theo</div>
-            <canvas id="next" width="120" height="120"></canvas>
-          </div>
-
-          <div class="panel">
             <div class="panelTitle">Trạng thái</div>
-            <div class="mono" id="status">Chưa bắt đầu</div>
-            <div class="row">
+            <div class="mono" id="status">Xem tranh gốc, bấm “Tôi đã nhớ” để bắt đầu.</div>
+
+            <div class="row" style="margin-top:10px">
               <button class="btn" id="btnStart">Bắt đầu</button>
+              <button class="btnGhost" id="btnShuffle">Trộn lại</button>
               <button class="btnGhost" id="btnRestart">Chơi lại</button>
             </div>
-          </div>
 
-          <div class="row">
+            <div class="row" style="margin-top:10px">
               <label class="toggle">
-              <input type="checkbox" id="toggleDrag" checked>
+                <input type="checkbox" id="toggleDrag" checked>
                 Bật kéo-thả
               </label>
-          </div>
-        <div class="note">
-      <b>Cảm ứng:</b> Chạm 1 ô để đặt/đổi. Bật “kéo-thả” để kéo mảnh từ ô này sang ô khác (swap).
-    </div>
+            </div>
 
-          <div class="panel mobilePad">
-            <div class="panelTitle">Nút (Mobile)</div>
-            <div class="pad">
-              <button class="btnPad" data-act="left">←</button>
-              <button class="btnPad" data-act="rot">↑</button>
-              <button class="btnPad" data-act="right">→</button>
-              <button class="btnPad" data-act="down">↓</button>
-              <button class="btnPad wide" data-act="drop">THẢ</button>
+            <div class="note">
+              Tip: Nếu bạn không muốn kéo-thả, tắt “Bật kéo-thả” rồi chạm 2 mảnh để đổi chỗ.
             </div>
           </div>
         </div>
       </div>
 
       <div class="note">
-        Mục tiêu: xếp gạch rơi (miếng 2 ô) để khớp màu đúng vị trí như tranh gốc. <br/>
-        - Đạt <b>100%</b> trước khi hết giờ ⇒ nhận số ngay. <br/>
-        - Hết giờ mà <b>≥ 80%</b> ⇒ chọn <b>1 trong 3 gương</b>, chỉ 1 gương có số đúng để đi tiếp. <br/>
+        - Đạt <b>100%</b> trước khi hết giờ ⇒ nhận số ngay.<br/>
+        - Hết giờ mà <b>≥ 80%</b> ⇒ chọn <b>1 trong 3 gương</b> (1 đúng).<br/>
         - Ngày 3 nhận <b>2 số</b>.
       </div>
     </section>
@@ -91,7 +79,7 @@
         <button class="btn" id="btnIRemember">Tôi đã nhớ → Chơi</button>
         <button class="btnGhost" id="btnCloseRef">Đóng</button>
       </div>
-      <div class="note">Bạn có thể xem tranh gốc trước khi bắt đầu. Khi đã xác nhận “Tôi đã nhớ”, game sẽ bắt đầu đếm 1:30.</div>
+      <div class="note">Game bắt đầu tính giờ sau khi bạn bấm “Tôi đã nhớ”.</div>
     </div>
   </div>
 
@@ -99,10 +87,7 @@
     <div class="modalBox">
       <h3 id="resultTitle">Kết quả</h3>
       <div class="mono" id="resultText"></div>
-      <div class="row" id="resultActions">
-        <button class="btn" id="btnBackHome">Về trang chính</button>
-        <button class="btnGhost" id="btnRetry">Chơi lại</button>
-      </div>
+      <div class="row" id="resultActions"></div>
     </div>
   </div>
 
@@ -119,6 +104,6 @@
 
   <script src="js/config.js"></script>
   <script src="js/storage.js"></script>
-  <script src="js/play.js?v=20260220b"></script>
+  <script src="js/play.js?v=20260220_puzzle"></script>
 </body>
 </html>
