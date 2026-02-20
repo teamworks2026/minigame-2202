@@ -1,4 +1,4 @@
-// js/play.js (TILE-IMAGE VERSION: cắt ảnh gốc thành gạch và ghép lại)
+// js/play.js (TILE + TOUCH + DRAG TOGGLE)
 (() => {
   Storage.ensureProfile();
 
@@ -30,10 +30,9 @@
     location.href = "index.html";
     return;
   }
-
-  // ----- DOM -----
   $("sceneTitle").textContent = dc.title;
 
+  // ----- DOM -----
   const canvas = $("game");
   const ctx = canvas.getContext("2d");
   const nextCanvas = $("next");
@@ -61,26 +60,31 @@
   const mirrorGrid = $("mirrorGrid");
   const btnMirrorCancel = $("btnMirrorCancel");
 
+  const toggleDrag = $("toggleDrag"); // NEW
+
   // ----- Game config -----
   const G = Config.GAME;
   const COLS = G.cols;
   const ROWS = G.rows;
   const TOTAL = COLS * ROWS;
 
-  // Resize canvas to fit grid nicely
-  const CELL = Math.floor(Math.min(520 / COLS, 520 / ROWS));
+  // Board cell size (auto-fit for mobile)
+  const maxW = Math.min(520, Math.max(260, window.innerWidth - 28));
+  const maxH = Math.min(520, Math.max(260, Math.floor(window.innerHeight * 0.55)));
+  const CELL = Math.floor(Math.min(maxW / COLS, maxH / ROWS));
+
   canvas.width = COLS * CELL;
   canvas.height = ROWS * CELL;
 
   // ----- Image slicing -----
-  let img = null;     // loaded Image
-  let tiles = null;   // tiles[id] = {sx,sy,sw,sh, tx,ty}
-  let bag = [];       // list of tile ids (shuffled)
+  let img = null;
+  let tiles = null; // tiles[id] = {sx,sy,sw,sh, tx,ty}
 
-  // ----- Board state -----
+  // ----- State -----
+  let bag = [];
   let board = null; // board[y][x] = tileId or null
 
-  // Piece is a single tile "cursor-falling"
+  // current "hand" tile
   let piece = { x: Math.floor(COLS / 2), y: 0, id: null };
   let nextId = null;
 
@@ -95,6 +99,18 @@
   let softDropping = false;
 
   let timerHandle = null;
+
+  // drag feature
+  let dragEnabled = true;
+  const K_DRAG = "cgp_drag_enabled";
+
+  const drag = {
+    active: false,
+    fromPiece: false,
+    id: null,
+    ox: null, oy: null,   // origin cell if dragging from board
+    px: 0, py: 0,         // pointer in canvas coords (for drawing)
+  };
 
   function tileTargetPos(id) {
     return { tx: id % COLS, ty: Math.floor(id / COLS) };
@@ -112,15 +128,13 @@
   function buildTiles(im) {
     const tw = im.naturalWidth / COLS;
     const th = im.naturalHeight / ROWS;
-
     const list = new Array(TOTAL);
+
     for (let ty = 0; ty < ROWS; ty++) {
       for (let tx = 0; tx < COLS; tx++) {
         const id = ty * COLS + tx;
         list[id] = {
-          id,
-          tx,
-          ty,
+          id, tx, ty,
           sx: Math.floor(tx * tw),
           sy: Math.floor(ty * th),
           sw: Math.ceil(tw),
@@ -129,32 +143,6 @@
       }
     }
     return list;
-  }
-
-  function resetGame() {
-    running = false;
-    started = false;
-    doneReward = false;
-
-    timer = G.seconds;
-    fallAccum = 0;
-    lastTs = 0;
-    softDropping = false;
-
-    board = Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => null));
-
-    bag = [];
-    for (let i = 0; i < TOTAL; i++) bag.push(i);
-    shuffle(bag);
-
-    piece = { x: Math.floor(COLS / 2), y: 0, id: bag.pop() ?? null };
-    nextId = bag.pop() ?? null;
-
-    drawNext();
-    updateHUD();
-    updateProgress();
-    statusEl.textContent = "Sẵn sàng. Hãy xem tranh gốc và bấm 'Tôi đã nhớ' để bắt đầu.";
-    draw();
   }
 
   function updateHUD() {
@@ -188,45 +176,8 @@
     ctx.globalAlpha = alpha;
     ctx.drawImage(img, t.sx, t.sy, t.sw, t.sh, dx, dy, CELL, CELL);
     ctx.globalAlpha = 1;
-    // viền nhẹ
     ctx.strokeStyle = "rgba(0,0,0,.25)";
     ctx.strokeRect(dx + 0.5, dy + 0.5, CELL - 1, CELL - 1);
-  }
-
-  function draw() {
-    // nền
-    ctx.fillStyle = "rgba(0,0,0,.22)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // tiles placed
-    for (let y = 0; y < ROWS; y++) {
-      for (let x = 0; x < COLS; x++) {
-        const id = board[y][x];
-        if (id != null) {
-          drawTileAt(id, x * CELL, y * CELL, 1);
-        } else {
-          // grid
-          ctx.strokeStyle = "rgba(255,255,255,.06)";
-          ctx.strokeRect(x * CELL + 0.5, y * CELL + 0.5, CELL - 1, CELL - 1);
-        }
-      }
-    }
-
-    // current piece preview (semi transparent)
-    if (piece.id != null) {
-      drawTileAt(piece.id, piece.x * CELL, piece.y * CELL, 0.85);
-      // highlight cursor
-      ctx.strokeStyle = "rgba(255,122,24,.85)";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(piece.x * CELL + 1, piece.y * CELL + 1, CELL - 2, CELL - 2);
-      ctx.lineWidth = 1;
-    } else {
-      // nếu không có mảnh trên tay: vẫn highlight ô đang chọn
-      ctx.strokeStyle = "rgba(255,122,24,.85)";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(piece.x * CELL + 1, piece.y * CELL + 1, CELL - 2, CELL - 2);
-      ctx.lineWidth = 1;
-    }
   }
 
   function drawNext() {
@@ -234,7 +185,6 @@
     if (nextId == null || !img) return;
 
     const t = tiles[nextId];
-    // fit center
     const size = Math.min(nextCanvas.width, nextCanvas.height) - 16;
     const dx = (nextCanvas.width - size) / 2;
     const dy = (nextCanvas.height - size) / 2;
@@ -244,54 +194,190 @@
     nctx.strokeRect(dx + 0.5, dy + 0.5, size - 1, size - 1);
   }
 
-  // ----- Placement actions -----
+  function draw() {
+    ctx.fillStyle = "rgba(0,0,0,.22)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        const id = board[y][x];
+        if (id != null) drawTileAt(id, x * CELL, y * CELL, 1);
+        else {
+          ctx.strokeStyle = "rgba(255,255,255,.06)";
+          ctx.strokeRect(x * CELL + 0.5, y * CELL + 0.5, CELL - 1, CELL - 1);
+        }
+      }
+    }
+
+    // current hand tile (preview)
+    if (!drag.active && piece.id != null) {
+      drawTileAt(piece.id, piece.x * CELL, piece.y * CELL, 0.85);
+    }
+
+    // cursor highlight
+    ctx.strokeStyle = "rgba(255,122,24,.85)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(piece.x * CELL + 1, piece.y * CELL + 1, CELL - 2, CELL - 2);
+    ctx.lineWidth = 1;
+
+    // floating tile while dragging
+    if (drag.active && drag.id != null) {
+      const dx = drag.px - CELL / 2;
+      const dy = drag.py - CELL / 2;
+      drawTileAt(drag.id, dx, dy, 0.95);
+
+      ctx.strokeStyle = "rgba(255,122,24,.9)";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(dx + 1, dy + 1, CELL - 2, CELL - 2);
+      ctx.lineWidth = 1;
+    }
+  }
+
+  function resetGame() {
+    running = false;
+    started = false;
+    doneReward = false;
+
+    timer = G.seconds;
+    fallAccum = 0;
+    lastTs = 0;
+    softDropping = false;
+
+    board = Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => null));
+
+    bag = [];
+    for (let i = 0; i < TOTAL; i++) bag.push(i);
+    shuffle(bag);
+
+    piece = { x: Math.floor(COLS / 2), y: 0, id: bag.pop() ?? null };
+    nextId = bag.pop() ?? null;
+
+    drag.active = false;
+    drag.id = null;
+
+    drawNext();
+    updateHUD();
+    updateProgress();
+    statusEl.textContent = "Sẵn sàng. Chạm để đặt, bật kéo-thả để đổi chỗ nhanh.";
+    draw();
+  }
+
   function spawnNext() {
-    piece.y = 0;
     piece.x = clamp(piece.x, 0, COLS - 1);
+    piece.y = clamp(piece.y, 0, ROWS - 1);
 
     piece.id = nextId;
     nextId = bag.pop() ?? null;
     drawNext();
   }
 
-  // Space / click: place or swap
-  function placeOrSwap() {
+  // Tap place/swap at current cursor cell
+  function placeAt(x, y) {
     if (!running) return;
     if (piece.id == null) return;
 
+    piece.x = clamp(x, 0, COLS - 1);
+    piece.y = clamp(y, 0, ROWS - 1);
+
     const cur = board[piece.y][piece.x];
     board[piece.y][piece.x] = piece.id;
+    piece.id = cur; // swap -> tile bị đè trở thành tile trên tay
 
-    // swap: nếu ô đã có mảnh => mảnh đó trở thành "mảnh đang cầm"
-    piece.id = cur;
-
-    updateProgress();
-    draw();
-
-    // nếu sau swap mà không còn mảnh trên tay (cur=null) => spawn next từ bag
     if (piece.id == null) {
-      if (nextId != null || bag.length > 0) {
-        spawnNext();
-      } else {
-        // hết bag và không còn mảnh trên tay: vẫn cho phép sửa bằng phím X (pick up)
-        statusEl.textContent = "Đã hết mảnh. Bạn có thể nhấn X để nhấc một mảnh lên và đổi chỗ.";
-      }
+      if (nextId != null || bag.length > 0) spawnNext();
     }
-  }
 
-  // X: pick up tile at cursor (để sửa khi hết mảnh hoặc muốn đổi)
-  function pickUpAtCursor() {
-    if (!running) return;
-    if (piece.id != null) return; // đang cầm mảnh rồi thì không nhấc
-    const cur = board[piece.y][piece.x];
-    if (cur == null) return;
-    board[piece.y][piece.x] = null;
-    piece.id = cur;
     updateProgress();
     draw();
   }
 
-  // ----- Timer & Loop -----
+  // ===== Touch helpers =====
+  function evtToCell(e) {
+    const rect = canvas.getBoundingClientRect();
+    // map to canvas coords
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+
+    const cx = (e.clientX - rect.left) * sx;
+    const cy = (e.clientY - rect.top) * sy;
+
+    const x = clamp(Math.floor(cx / CELL), 0, COLS - 1);
+    const y = clamp(Math.floor(cy / CELL), 0, ROWS - 1);
+    return { x, y, px: cx, py: cy };
+  }
+
+  // Drag swap between cells (when enabled)
+  function startDragFromBoard(cell) {
+    const id = board[cell.y][cell.x];
+    if (id == null) return false;
+    drag.active = true;
+    drag.fromPiece = false;
+    drag.id = id;
+    drag.ox = cell.x;
+    drag.oy = cell.y;
+    drag.px = cell.px;
+    drag.py = cell.py;
+    board[cell.y][cell.x] = null; // take out
+    return true;
+  }
+
+  function startDragFromPiece(cell) {
+    if (piece.id == null) return false;
+    drag.active = true;
+    drag.fromPiece = true;
+    drag.id = piece.id;
+    drag.ox = null;
+    drag.oy = null;
+    drag.px = cell.px;
+    drag.py = cell.py;
+    piece.id = null; // temporarily remove from hand while dragging
+    return true;
+  }
+
+  function cancelDrag() {
+    if (!drag.active) return;
+    if (drag.fromPiece) {
+      // restore to hand
+      piece.id = drag.id;
+    } else {
+      // restore to origin
+      board[drag.oy][drag.ox] = drag.id;
+    }
+    drag.active = false;
+    drag.id = null;
+    updateProgress();
+    draw();
+  }
+
+  function endDrag(cell) {
+    if (!drag.active) return;
+
+    if (drag.fromPiece) {
+      // place dragged tile onto drop cell; swap with board cell -> becomes hand tile
+      const old = board[cell.y][cell.x];
+      board[cell.y][cell.x] = drag.id;
+      piece.id = old;
+      piece.x = cell.x;
+      piece.y = cell.y;
+
+      if (piece.id == null) {
+        if (nextId != null || bag.length > 0) spawnNext();
+      }
+    } else {
+      // swap between origin cell and drop cell
+      const old = board[cell.y][cell.x];
+      board[cell.y][cell.x] = drag.id;
+      board[drag.oy][drag.ox] = old;
+    }
+
+    drag.active = false;
+    drag.id = null;
+
+    updateProgress();
+    draw();
+  }
+
+  // ===== Timer & loop =====
   function startTimer() {
     if (timerHandle) clearInterval(timerHandle);
     timerHandle = setInterval(() => {
@@ -309,28 +395,29 @@
     piece.y++;
     if (piece.y >= ROWS) piece.y = 0;
   }
-  function stepUpWrap() {
-    piece.y--;
-    if (piece.y < 0) piece.y = ROWS - 1;
-  }
 
   function loop(ts) {
     if (!running) return;
+
     if (!lastTs) lastTs = ts;
     const dt = ts - lastTs;
     lastTs = ts;
 
-    const speed = softDropping ? G.softDropMs : tickMs;
-    fallAccum += dt;
-    while (fallAccum >= speed) {
-      fallAccum -= speed;
-      stepDownWrap();
+    // Khi bật kéo-thả: không auto-rơi (đỡ khó trên mobile)
+    if (!dragEnabled && !drag.active) {
+      const speed = softDropping ? G.softDropMs : tickMs;
+      fallAccum += dt;
+      while (fallAccum >= speed) {
+        fallAccum -= speed;
+        stepDownWrap();
+      }
     }
+
     draw();
     requestAnimationFrame(loop);
   }
 
-  // ----- Finish / Reward -----
+  // ===== Reward/Mirror (giữ nguyên logic) =====
   function showResult(title, html, actions) {
     modalResult.classList.add("show");
     resultTitle.textContent = title;
@@ -353,12 +440,8 @@
     }
   }
 
-  function randDigit() {
-    return String(Math.floor(Math.random() * 10));
-  }
-  function randTwo() {
-    return pad2(Math.floor(Math.random() * 100));
-  }
+  function randDigit() { return String(Math.floor(Math.random() * 10)); }
+  function randTwo() { return pad2(Math.floor(Math.random() * 100)); }
 
   function showMirror(accuracy, timeUsed) {
     modalMirror.classList.add("show");
@@ -370,6 +453,7 @@
       const d = correct.length === 2 ? randTwo() : randDigit();
       if (d !== correct && !decoys.includes(d)) decoys.push(d);
     }
+
     const options = shuffle([correct, decoys[0], decoys[1]]);
     const correctIndex = options.indexOf(correct);
 
@@ -464,59 +548,73 @@
     );
   }
 
-  // ----- Controls -----
-  function move(dx) {
-    piece.x = clamp(piece.x + dx, 0, COLS - 1);
-    draw();
-  }
+  // ===== Keyboard (desktop giữ lại) =====
+  function move(dx) { piece.x = clamp(piece.x + dx, 0, COLS - 1); draw(); }
 
   window.addEventListener("keydown", (e) => {
-    if (["ArrowLeft", "ArrowRight", "ArrowDown", "ArrowUp", "Space", "KeyX"].includes(e.code)) e.preventDefault();
+    if (["ArrowLeft", "ArrowRight", "ArrowDown", "ArrowUp", "Space"].includes(e.code)) e.preventDefault();
+    if (!running) return;
 
     if (e.code === "ArrowLeft") move(-1);
     if (e.code === "ArrowRight") move(1);
-    if (e.code === "ArrowUp") { if (running) { stepUpWrap(); draw(); } }
-    if (e.code === "Space") placeOrSwap();
-    if (e.code === "KeyX") pickUpAtCursor();
-
+    if (e.code === "ArrowUp") { piece.y = clamp(piece.y - 1, 0, ROWS - 1); draw(); }
+    if (e.code === "Space") placeAt(piece.x, piece.y);
     if (e.code === "ArrowDown") softDropping = true;
   });
+  window.addEventListener("keyup", (e) => { if (e.code === "ArrowDown") softDropping = false; });
 
-  window.addEventListener("keyup", (e) => {
-    if (e.code === "ArrowDown") softDropping = false;
+  // ===== TOUCH / POINTER =====
+  let downInfo = null;
+
+  canvas.addEventListener("pointerdown", (e) => {
+    if (!running) return;
+    canvas.setPointerCapture?.(e.pointerId);
+
+    const cell = evtToCell(e);
+    downInfo = { x: cell.x, y: cell.y, mx: cell.px, my: cell.py, t: Date.now() };
+
+    if (dragEnabled) {
+      // ưu tiên kéo mảnh đang đặt trên board, nếu trống thì kéo mảnh trên tay
+      if (!startDragFromBoard(cell)) {
+        startDragFromPiece(cell);
+      }
+      draw();
+    }
   });
 
-  // Click support (dễ chơi hơn)
-  canvas.addEventListener("click", () => placeOrSwap());
-  canvas.addEventListener("contextmenu", (e) => {
-    e.preventDefault();
-    pickUpAtCursor();
+  canvas.addEventListener("pointermove", (e) => {
+    if (!running) return;
+    if (!drag.active) return;
+    const cell = evtToCell(e);
+    drag.px = cell.px;
+    drag.py = cell.py;
+    draw();
   });
 
-  // Mobile pad (nếu có)
-  document.querySelectorAll(".btnPad").forEach((btn) => {
-    const act = btn.getAttribute("data-act");
-    btn.addEventListener(
-      "touchstart",
-      (e) => {
-        e.preventDefault();
-        if (act === "left") move(-1);
-        if (act === "right") move(1);
-        if (act === "rot") { if (running) { stepUpWrap(); draw(); } }     // dùng nút ↑ như "lên"
-        if (act === "down") softDropping = true;
-        if (act === "drop") placeOrSwap();                                // dùng nút THẢ = đặt
-      },
-      { passive: false }
-    );
-    btn.addEventListener("touchend", () => {
-      if (act === "down") softDropping = false;
-    });
+  window.addEventListener("pointerup", (e) => {
+    if (!running) return;
+    const cell = evtToCell(e);
+
+    // Drag end
+    if (drag.active) {
+      endDrag(cell);
+      downInfo = null;
+      return;
+    }
+
+    // Tap-to-place when drag is OFF
+    if (!dragEnabled && downInfo) {
+      // treat as tap
+      placeAt(cell.x, cell.y);
+      downInfo = null;
+    }
   });
 
-  // ----- Ref modal flow -----
-  function openRef() {
-    modalRef.classList.add("show");
-  }
+  // chống scroll khi kéo trên canvas (mobile)
+  canvas.style.touchAction = "none";
+
+  // ===== Ref modal flow =====
+  function openRef() { modalRef.classList.add("show"); }
   btnShowRef.onclick = openRef;
   btnCloseRef.onclick = () => modalRef.classList.remove("show");
 
@@ -525,15 +623,13 @@
     if (!started) {
       running = true;
       started = true;
-      statusEl.textContent = "Đang chơi... (Space để đặt • X để nhấc mảnh)";
+      statusEl.textContent = "Đang chơi... (Chạm để đặt • Bật kéo-thả để swap nhanh)";
       startTimer();
       requestAnimationFrame(loop);
     }
   };
 
-  btnStart.onclick = () => {
-    if (!started) openRef();
-  };
+  btnStart.onclick = () => { if (!started) openRef(); };
 
   btnRestart.onclick = () => {
     modalRef.classList.remove("show");
@@ -546,13 +642,38 @@
 
   btnMirrorCancel.onclick = () => modalMirror.classList.remove("show");
 
-  // ----- Init -----
+  // ===== Drag toggle persistence =====
+  function loadDragSetting() {
+    const v = localStorage.getItem(K_DRAG);
+    dragEnabled = (v == null) ? true : (v === "1");
+    if (toggleDrag) toggleDrag.checked = dragEnabled;
+  }
+  function saveDragSetting(v) {
+    localStorage.setItem(K_DRAG, v ? "1" : "0");
+  }
+
+  if (toggleDrag) {
+    loadDragSetting();
+    toggleDrag.addEventListener("change", () => {
+      dragEnabled = !!toggleDrag.checked;
+      saveDragSetting(dragEnabled);
+      // nếu đang kéo mà tắt thì hủy
+      if (!dragEnabled && drag.active) cancelDrag();
+      statusEl.textContent = dragEnabled
+        ? "Kéo-thả đang BẬT: kéo mảnh để đổi chỗ (swap)."
+        : "Kéo-thả đang TẮT: chạm 1 ô để đặt/đổi.";
+      draw();
+    });
+  } else {
+    loadDragSetting();
+  }
+
+  // ===== Init =====
   (async function init() {
     try {
       statusEl.textContent = "Đang tải ảnh thành phố...";
       refImgEl.src = dc.img;
 
-      // NOTE: Ảnh phải host cùng domain (GitHub Pages ok). Nếu nhúng ảnh ngoài domain có thể bị CORS.
       img = await loadImage(dc.img);
       tiles = buildTiles(img);
 
@@ -561,8 +682,7 @@
       statusEl.textContent = "Xem tranh gốc, bấm 'Tôi đã nhớ' để bắt đầu.";
     } catch (err) {
       console.error(err);
-      statusEl.textContent =
-        "Lỗi tải ảnh. Hãy chắc chắn assets/dayX.jpg đúng đường dẫn và ảnh không bị chặn CORS.";
+      statusEl.textContent = "Lỗi tải ảnh. Kiểm tra assets/dayX.jpg và CORS.";
       alert("Lỗi: " + err.message);
     }
   })();
