@@ -1,0 +1,243 @@
+:root{
+  --bg:#0b1020;
+  --card:#111a33;
+  --card2:#0f1730;
+  --text:#e9eefc;
+  --muted:#a9b4d0;
+  --accent:#ff7a18;      /* CAM */
+  --accent2:#ff9b4a;
+  --danger:#ff4d4d;
+  --ok:#39d98a;
+  --line:rgba(255,255,255,.08);
+  --shadow: 0 10px 30px rgba(0,0,0,.35);
+  --radius:18px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: radial-gradient(1200px 600px at 20% 0%, rgba(255,122,24,.18), transparent 60%),
+              radial-gradient(900px 500px at 80% 10%, rgba(255,155,74,.14), transparent 55%),
+              var(--bg);
+  color:var(--text);
+}
+
+.topbar{
+  position:sticky; top:0; z-index:10;
+  display:flex; align-items:center; gap:12px;
+  padding:12px 16px;
+  background: rgba(9,13,28,.82);
+  backdrop-filter: blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.link{
+  color:var(--text);
+  text-decoration:none;
+  opacity:.9;
+}
+.link:hover{opacity:1}
+.title{font-weight:700; letter-spacing:.2px}
+.brand{display:flex; flex-direction:column}
+.brandTitle{font-weight:800}
+.brandSub{color:var(--muted); font-size:13px; margin-top:2px}
+
+.container{
+  max-width:1100px;
+  margin:18px auto 60px;
+  padding:0 14px;
+  display:grid;
+  gap:14px;
+}
+
+.card{
+  background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+  border:1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding:14px;
+}
+
+h2{margin:0 0 10px 0}
+.row{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px}
+.label{min-width:160px; color:var(--muted)}
+.input{
+  width:min(420px, 100%);
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid var(--line);
+  background: rgba(255,255,255,.04);
+  color:var(--text);
+  outline:none;
+}
+.input:focus{border-color: rgba(255,122,24,.6)}
+.mono{font-family:var(--mono); background: rgba(255,255,255,.04); padding:6px 10px; border-radius:10px; border:1px solid var(--line)}
+
+.btn, .btnGhost{
+  border-radius:14px;
+  padding:10px 12px;
+  font-weight:700;
+  cursor:pointer;
+  border:1px solid transparent;
+  transition: transform .05s ease, opacity .15s ease, background .15s ease;
+}
+.btn{
+  background: linear-gradient(180deg, var(--accent2), var(--accent));
+  color:#1a0e06;
+}
+.btn:hover{opacity:.95}
+.btn:active{transform: scale(.98)}
+.btnGhost{
+  background: rgba(255,255,255,.05);
+  border-color: var(--line);
+  color:var(--text);
+}
+.btnGhost:hover{background: rgba(255,255,255,.07)}
+.note{
+  margin-top:10px;
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.45;
+}
+
+.grid3{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap:12px;
+  margin-top:12px;
+}
+.dayCard{
+  background: rgba(0,0,0,.18);
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:12px;
+}
+.dayTitle{font-weight:900}
+.daySub{color:var(--muted); font-size:13px; margin-top:3px}
+.dayStatus{margin:10px 0; font-family:var(--mono); font-size:13px}
+
+.progressWrap{display:flex; align-items:center; gap:12px; margin-top:10px}
+.progressBar{
+  flex:1;
+  height:12px;
+  background: rgba(255,255,255,.06);
+  border:1px solid var(--line);
+  border-radius:999px;
+  overflow:hidden;
+}
+.progressFill{
+  height:100%;
+  width:0%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+}
+.progressText{color:var(--muted); font-size:13px}
+
+/* Game */
+.gameCard{padding:12px}
+.gameHud{
+  display:flex; gap:12px; flex-wrap:wrap;
+  padding:10px 10px;
+  background: rgba(0,0,0,.18);
+  border:1px solid var(--line);
+  border-radius:16px;
+}
+.hudItem{min-width:220px}
+.hudLabel{color:var(--muted); font-size:12px}
+.hudValue{font-weight:900; font-size:18px}
+.hudSmall{color:var(--muted); font-size:12px; line-height:1.35}
+
+.gameWrap{
+  display:grid;
+  grid-template-columns: 1fr 320px;
+  gap:12px;
+  margin-top:12px;
+  align-items:start;
+}
+#game{
+  width:100%;
+  max-width:520px;
+  background: rgba(0,0,0,.22);
+  border:1px solid var(--line);
+  border-radius:18px;
+}
+.side{display:grid; gap:12px}
+.panel{
+  background: rgba(0,0,0,.18);
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:10px;
+}
+.panelTitle{font-weight:900; margin-bottom:8px}
+#next{
+  width:100%;
+  background: rgba(255,255,255,.04);
+  border:1px solid var(--line);
+  border-radius:14px;
+}
+
+.mobilePad{display:none}
+.pad{display:grid; grid-template-columns: repeat(3, 1fr); gap:8px}
+.btnPad{
+  padding:12px 10px;
+  border-radius:14px;
+  border:1px solid var(--line);
+  background: rgba(255,255,255,.05);
+  color:var(--text);
+  font-weight:900;
+  cursor:pointer;
+}
+.btnPad.wide{grid-column: 1 / span 3}
+.btnPad:active{transform: scale(.98)}
+
+/* Modals */
+.modal{
+  position:fixed; inset:0;
+  background: rgba(0,0,0,.55);
+  display:none;
+  align-items:center; justify-content:center;
+  padding:16px;
+  z-index:999;
+}
+.modal.show{display:flex}
+.modalBox{
+  width:min(760px, 100%);
+  background: linear-gradient(180deg, rgba(17,26,51,.98), rgba(15,23,48,.98));
+  border:1px solid var(--line);
+  border-radius:18px;
+  box-shadow: var(--shadow);
+  padding:14px;
+}
+.modalBox h3{margin:0 0 10px 0}
+.refWrap{
+  border-radius:16px;
+  overflow:hidden;
+  border:1px solid var(--line);
+  background: rgba(0,0,0,.2);
+}
+.refWrap img{width:100%; display:block; max-height:60vh; object-fit:cover}
+
+.mirrorGrid{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap:10px;
+  margin:12px 0;
+}
+.mirror{
+  border-radius:16px;
+  border:1px solid var(--line);
+  background: rgba(255,255,255,.05);
+  padding:12px;
+  cursor:pointer;
+}
+.mirror:hover{background: rgba(255,255,255,.08)}
+.mirrorTitle{font-weight:900}
+.mirrorSub{color:var(--muted); font-size:12px; margin-top:4px}
+
+/* Responsive */
+@media (max-width: 920px){
+  .grid3{grid-template-columns: 1fr}
+  .gameWrap{grid-template-columns: 1fr}
+  #game{max-width:100%}
+  .mobilePad{display:block}
+}
