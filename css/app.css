@@ -254,50 +254,6 @@ h2{margin:0 0 10px 0}
 }
 .toggle input{ transform: scale(1.2); }
 
-.puzzleWrap{
-  display:grid;
-  grid-template-columns: 1fr 320px;
-  gap:12px;
-  margin-top:12px;
-  align-items:start;
-}
-.puzzleBoard{
-  width:100%;
-  max-width:760px;
-  background: rgba(0,0,0,.22);
-  border:1px solid var(--line);
-  border-radius:18px;
-  padding:10px;
-}
-.puzzleBoard.disabled{opacity:.65}
-.puzTile{
-  border-radius:12px;
-  border:1px solid rgba(255,255,255,.08);
-  background-repeat:no-repeat;
-  background-color: rgba(255,255,255,.04);
-  aspect-ratio: 1 / 1;
-}
-.puzTile.selected{
-  outline: 3px solid rgba(255,122,24,.9);
-  outline-offset: 2px;
-}
-
-/* TẮT hiệu ứng vòng sáng trên mobile */
-@media (max-width: 920px){
-  .gameCard::before,
-  .gameCard::after,
-  .card::before,
-  .card::after,
-  .container::before,
-  .container::after{
-    display:none !important;
-    content:none !important;
-    background:none !important;
-    filter:none !important;
-    opacity:0 !important;
-  }
-}
-
 /* Ẩn toggle nếu còn sót trong HTML */
 .toggle{display:none !important;}
 
