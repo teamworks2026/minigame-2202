@@ -288,16 +288,16 @@ h2{margin:0 0 10px 0}
 /* Ẩn toggle nếu còn sót trong HTML */
 .toggle{display:none !important;}
 
-/* Tile đẹp + có hiệu ứng */
+/* Drag must work on mobile */
+.puzzleBoard, .puzTile { touch-action: none; }
+
 .puzTile{
-  position: relative;
   cursor: grab;
   user-select: none;
   transition: transform .12s ease, box-shadow .12s ease, filter .12s ease, outline-color .12s ease;
 }
 .puzTile:active{ cursor: grabbing; }
 
-/* Tile đang được kéo */
 .puzTile.dragging{
   transform: scale(1.04);
   box-shadow: 0 14px 34px rgba(0,0,0,.55);
@@ -306,8 +306,6 @@ h2{margin:0 0 10px 0}
   outline-offset: 2px;
   z-index: 5;
 }
-
-/* Ô đang là mục tiêu thả */
 .puzTile.dropTarget{
   outline: 3px dashed rgba(255,122,24,.9);
   outline-offset: 2px;
