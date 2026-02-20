@@ -53,9 +53,9 @@
   const mirrorGrid = $("mirrorGrid");
   const btnMirrorCancel = $("btnMirrorCancel");
 
-  const toggleDrag = $("toggleDrag"); // có thể null nếu bạn đã xoá khỏi HTML
   let dragEnabled = true; // LUÔN BẬT
   if (toggleDrag) toggleDrag.style.display = "none";
+  let suppressClickUntil = 0;
 
   let img = null;
   let started = false;
@@ -167,8 +167,8 @@
   // ===== Tap-to-swap (always works on mobile) =====
   function onTapSwap(e) {
     if (!running) return;
-    if (dragEnabled) return; // khi bật kéo-thả, ưu tiên drag, tap vẫn ok nhưng mình khóa để tránh double
-    const pos = Number(e.currentTarget.dataset.pos);
+  if (Date.now() < suppressClickUntil) return; // vừa kéo thả xong thì bỏ qua click
+  const pos = Number(e.currentTarget.dataset.pos);
 
     // select first
     if (selectedPos == null) {
@@ -193,6 +193,10 @@
   // ===== Drag-to-swap (pointer events) =====
 let dragging = null; // {fromPos, el}
 
+function clearDropTargets(){
+  boardEl.querySelectorAll(".puzTile.dropTarget").forEach(el => el.classList.remove("dropTarget"));
+}
+
 function onPointerDown(e) {
   if (!running || !dragEnabled) return;
   e.preventDefault();
@@ -203,11 +207,11 @@ function onPointerDown(e) {
   dragging = { fromPos, el: fromEl };
   fromEl.classList.add("dragging");
 
-  boardEl.setPointerCapture?.(e.pointerId);
+  // bắt pointer vào chính tile (ổn định hơn)
+  fromEl.setPointerCapture?.(e.pointerId);
 
   const move = (ev) => {
     if (!dragging) return;
-    // highlight ô đang trỏ tới (drop target)
     const pointEl = document.elementFromPoint(ev.clientX, ev.clientY);
     const target = pointEl?.closest?.(".puzTile");
     clearDropTargets();
@@ -221,7 +225,6 @@ function onPointerDown(e) {
     const target = pointEl?.closest?.(".puzTile");
     const toPos = target ? Number(target.dataset.pos) : null;
 
-    // cleanup UI
     dragging.el.classList.remove("dragging");
     clearDropTargets();
 
@@ -231,12 +234,16 @@ function onPointerDown(e) {
     window.removeEventListener("pointermove", move);
     window.removeEventListener("pointerup", up);
 
-    if (toPos != null) swapPos(a, toPos);
+    if (toPos != null) {
+      swapPos(a, toPos);
+      suppressClickUntil = Date.now() + 250; // ngăn click swap chen vào
+    }
   };
 
   window.addEventListener("pointermove", move, { passive: true });
   window.addEventListener("pointerup", up, { passive: true });
 }
+
 
   // ===== Timer =====
   function startTimer() {
