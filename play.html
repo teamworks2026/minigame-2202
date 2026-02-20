@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Play - MiniGame 2202</title>
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div class="topbar">
+    <a class="link" href="index.html">← Trang chính</a>
+    <div class="title" id="sceneTitle">Day ?</div>
+    <button class="btnGhost" id="btnShowRef">Hiển thị tranh gốc</button>
+  </div>
+
+  <main class="container">
+    <section class="card gameCard">
+      <div class="gameHud">
+        <div class="hudItem">
+          <div class="hudLabel">Thời gian</div>
+          <div class="hudValue" id="timeLeft">01:30</div>
+        </div>
+        <div class="hudItem">
+          <div class="hudLabel">Tiến độ đúng</div>
+          <div class="hudValue" id="progress">0%</div>
+        </div>
+        <div class="hudItem">
+          <div class="hudLabel">Điều khiển</div>
+          <div class="hudSmall">← → di chuyển • ↑ xoay • ↓ rơi nhanh • Space thả</div>
+        </div>
+      </div>
+
+      <div class="gameWrap">
+        <canvas id="game" width="360" height="504"></canvas>
+
+        <div class="side">
+          <div class="panel">
+            <div class="panelTitle">Miếng tiếp theo</div>
+            <canvas id="next" width="120" height="120"></canvas>
+          </div>
+
+          <div class="panel">
+            <div class="panelTitle">Trạng thái</div>
+            <div class="mono" id="status">Chưa bắt đầu</div>
+            <div class="row">
+              <button class="btn" id="btnStart">Bắt đầu</button>
+              <button class="btnGhost" id="btnRestart">Chơi lại</button>
+            </div>
+          </div>
+
+          <div class="panel mobilePad">
+            <div class="panelTitle">Nút (Mobile)</div>
+            <div class="pad">
+              <button class="btnPad" data-act="left">←</button>
+              <button class="btnPad" data-act="rot">↑</button>
+              <button class="btnPad" data-act="right">→</button>
+              <button class="btnPad" data-act="down">↓</button>
+              <button class="btnPad wide" data-act="drop">THẢ</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="note">
+        Mục tiêu: xếp gạch rơi (miếng 2 ô) để khớp màu đúng vị trí như tranh gốc. <br/>
+        - Đạt <b>100%</b> trước khi hết giờ ⇒ nhận số ngay. <br/>
+        - Hết giờ mà <b>≥ 80%</b> ⇒ chọn <b>1 trong 3 gương</b>, chỉ 1 gương có số đúng để đi tiếp. <br/>
+        - Ngày 3 nhận <b>2 số</b>.
+      </div>
+    </section>
+  </main>
+
+  <!-- MODALS -->
+  <div class="modal" id="modalRef">
+    <div class="modalBox">
+      <h3>Tranh gốc (hãy ghi nhớ!)</h3>
+      <div class="refWrap">
+        <img id="refImg" alt="reference" />
+      </div>
+      <div class="row">
+        <button class="btn" id="btnIRemember">Tôi đã nhớ → Chơi</button>
+        <button class="btnGhost" id="btnCloseRef">Đóng</button>
+      </div>
+      <div class="note">Bạn có thể xem tranh gốc trước khi bắt đầu. Khi đã xác nhận “Tôi đã nhớ”, game sẽ bắt đầu đếm 1:30.</div>
+    </div>
+  </div>
+
+  <div class="modal" id="modalResult">
+    <div class="modalBox">
+      <h3 id="resultTitle">Kết quả</h3>
+      <div class="mono" id="resultText"></div>
+      <div class="row" id="resultActions">
+        <button class="btn" id="btnBackHome">Về trang chính</button>
+        <button class="btnGhost" id="btnRetry">Chơi lại</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="modalMirror">
+    <div class="modalBox">
+      <h3>Chọn Gương Báu</h3>
+      <div class="note">Chỉ <b>1</b> trong 3 gương có con số đúng để bạn đi tiếp.</div>
+      <div class="mirrorGrid" id="mirrorGrid"></div>
+      <div class="row">
+        <button class="btnGhost" id="btnMirrorCancel">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/play.js"></script>
+</body>
+</html>
