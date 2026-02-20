@@ -15,13 +15,13 @@ const Config = (() => {
   // Độ khó game
   // cols*rows nên là số chẵn (vì miếng rơi 2 ô)
   const GAME = {
-    cols: 10,
-    rows: 14,
-    seconds: 90,             // 1 phút 30s
-    tickMs: 650,             // tốc độ rơi (ms)
-    softDropMs: 40,          // giữ ↓ rơi nhanh
-    passThreshold: 80,       // >=80% thì mở gương báu khi hết giờ
-  };
+  cols: 6,               // ít ô hơn => dễ hơn (48 mảnh)
+  rows: 8,
+  seconds: 90,           // 1 phút 30s giữ nguyên
+  tickMs: 520,           // tốc độ rơi
+  softDropMs: 80,        // giữ ↓ rơi nhanh
+  passThreshold: 80,
+};
 
   // ====== Google Form / Submit site ======
   // Bạn thay FORM_URL bằng link prefill của form của bạn.
