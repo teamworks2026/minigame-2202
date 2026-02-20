@@ -15,11 +15,9 @@ const Config = (() => {
   // Độ khó game
   // cols*rows nên là số chẵn (vì miếng rơi 2 ô)
   const GAME = {
-  cols: 5,               // ít ô hơn => dễ hơn (48 mảnh)
-  rows: 2,
-  seconds: 90,           // 1 phút 30s giữ nguyên
-  tickMs: 520,           // tốc độ rơi
-  softDropMs: 80,        // giữ ↓ rơi nhanh
+  cols: 4,
+  rows: 3,
+  seconds: 90,
   passThreshold: 80,
 };
 
