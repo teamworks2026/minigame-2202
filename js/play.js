@@ -53,10 +53,9 @@
   const mirrorGrid = $("mirrorGrid");
   const btnMirrorCancel = $("btnMirrorCancel");
 
-  const toggleDrag = $("toggleDrag");
-  const K_DRAG = "cgp_puzzle_drag";
-  let dragEnabled = (localStorage.getItem(K_DRAG) ?? "1") === "1";
-  toggleDrag.checked = dragEnabled;
+  const toggleDrag = $("toggleDrag"); // có thể null nếu bạn đã xoá khỏi HTML
+  let dragEnabled = true; // LUÔN BẬT
+  if (toggleDrag) toggleDrag.style.display = "none";
 
   let img = null;
   let started = false;
@@ -192,38 +191,52 @@
   }
 
   // ===== Drag-to-swap (pointer events) =====
-  let dragging = null; // {fromPos, moved}
-  function onPointerDown(e) {
-    if (!running || !dragEnabled) return;
-    e.preventDefault();
+let dragging = null; // {fromPos, el}
 
-    const fromPos = Number(e.currentTarget.dataset.pos);
-    dragging = { fromPos, moved: false };
+function onPointerDown(e) {
+  if (!running || !dragEnabled) return;
+  e.preventDefault();
 
-    boardEl.setPointerCapture?.(e.pointerId);
+  const fromPos = Number(e.currentTarget.dataset.pos);
+  const fromEl = e.currentTarget;
 
-    const move = (ev) => {
-      if (!dragging) return;
-      dragging.moved = true;
-    };
+  dragging = { fromPos, el: fromEl };
+  fromEl.classList.add("dragging");
 
-    const up = (ev) => {
-      if (!dragging) return;
-      const pointEl = document.elementFromPoint(ev.clientX, ev.clientY);
-      const target = pointEl?.closest?.(".puzTile");
-      const toPos = target ? Number(target.dataset.pos) : null;
-      const a = dragging.fromPos;
-      dragging = null;
+  boardEl.setPointerCapture?.(e.pointerId);
 
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
+  const move = (ev) => {
+    if (!dragging) return;
+    // highlight ô đang trỏ tới (drop target)
+    const pointEl = document.elementFromPoint(ev.clientX, ev.clientY);
+    const target = pointEl?.closest?.(".puzTile");
+    clearDropTargets();
+    if (target && target !== dragging.el) target.classList.add("dropTarget");
+  };
 
-      if (toPos != null) swapPos(a, toPos);
-    };
+  const up = (ev) => {
+    if (!dragging) return;
 
-    window.addEventListener("pointermove", move, { passive: true });
-    window.addEventListener("pointerup", up, { passive: true });
-  }
+    const pointEl = document.elementFromPoint(ev.clientX, ev.clientY);
+    const target = pointEl?.closest?.(".puzTile");
+    const toPos = target ? Number(target.dataset.pos) : null;
+
+    // cleanup UI
+    dragging.el.classList.remove("dragging");
+    clearDropTargets();
+
+    const a = dragging.fromPos;
+    dragging = null;
+
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", up);
+
+    if (toPos != null) swapPos(a, toPos);
+  };
+
+  window.addEventListener("pointermove", move, { passive: true });
+  window.addEventListener("pointerup", up, { passive: true });
+}
 
   // ===== Timer =====
   function startTimer() {
